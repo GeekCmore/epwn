@@ -8,6 +8,7 @@ import os
 from typing import List, Dict, Optional, Tuple
 from dataclasses import dataclass
 import time
+from .config import config
 
 @dataclass
 class DownloadResult:
@@ -20,37 +21,38 @@ class DownloadResult:
 class Downloader:
     """下载器"""
     def __init__(self, 
-                 save_dir: str = "downloads",
-                 max_workers: int = 5,
-                 chunk_size: int = 8192,
-                 max_retries: int = 3,
-                 timeout: int = 30,
+                 save_dir: Optional[str] = None,
+                 max_workers: Optional[int] = None,
+                 chunk_size: Optional[int] = None,
+                 max_retries: Optional[int] = None,
+                 timeout: Optional[int] = None,
                  proxies: Optional[Dict[str, str]] = None):
         """
         初始化下载器
         
         Args:
-            save_dir: 下载文件保存目录
-            max_workers: 最大并发下载数
-            chunk_size: 下载块大小
-            max_retries: 最大重试次数
-            timeout: 请求超时时间(秒)
+            save_dir: 下载文件保存目录，默认使用配置值
+            max_workers: 最大并发下载数，默认使用配置值
+            chunk_size: 下载块大小，默认使用配置值
+            max_retries: 最大重试次数，默认使用配置值
+            timeout: 请求超时时间(秒)，默认使用配置值
             proxies: 代理设置，格式如 {
                 'http': 'http://user:pass@10.10.1.10:3128/',
                 'https': 'http://10.10.1.10:1080',
                 'socks5': 'socks5://user:pass@host:port'
-            }
+            }，默认使用配置值
         """
-        self.save_dir = Path(save_dir)
-        self.max_workers = max_workers
-        self.chunk_size = chunk_size
-        self.max_retries = max_retries
-        self.timeout = timeout
-        self.proxies = proxies
+        # 从配置获取默认值
+        self.save_dir = Path(save_dir or config.get("download", "save_dir"))
+        self.max_workers = max_workers or config.get("download", "max_workers")
+        self.chunk_size = chunk_size or config.get("download", "chunk_size")
+        self.max_retries = max_retries or config.get("download", "max_retries")
+        self.timeout = timeout or config.get("download", "timeout")
+        self.proxies = proxies or config.get("download", "proxies")
         self.console = Console()
         
         # 创建保存目录
-        os.makedirs(save_dir, exist_ok=True)
+        os.makedirs(self.save_dir, exist_ok=True)
         
     def _download_file(self, url: str, size: int, progress, overall_task) -> DownloadResult:
         """

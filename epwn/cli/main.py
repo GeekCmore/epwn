@@ -7,6 +7,7 @@ import sys
 # 导入命令模块
 from .commands.glibc import glibc
 from .commands.patch import patch
+from .commands.config import config_cli
 
 console = Console()
 
@@ -18,6 +19,7 @@ def cli():
 # 注册命令组
 cli.add_command(glibc)
 cli.add_command(patch)
+cli.add_command(config_cli, name="config")
 
 # 为了兼容性添加别名
 main = cli
