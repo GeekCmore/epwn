@@ -1,4 +1,4 @@
- #!/usr/bin/env python3
+#!/usr/bin/env python3
 import click
 from rich.console import Console
 from pathlib import Path
@@ -18,6 +18,9 @@ def cli():
 # 注册命令组
 cli.add_command(glibc)
 cli.add_command(patch)
+
+# 为了兼容性添加别名
+main = cli
 
 if __name__ == '__main__':
     cli()
