@@ -1,0 +1,33 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "epwn"
+version = "0.1.0"
+authors = [
+  { name="GeekCmore", email="geekcmore@163.om" },
+]
+description = "A tool for managing GLIBC versions and patching ELF files"
+readme = "README.md"
+requires-python = ">=3.7"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Topic :: Software Development :: Debuggers",
+    "Topic :: System :: Systems Administration",
+]
+dependencies = [
+    "click>=8.0.0",
+    "rich>=10.0.0",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/GeekCmore/epwn"
+"Bug Tracker" = "https://github.com/GeekCmore/epwn/issues"
+
+[project.scripts]
+epwn = "epwn.cli.main:main"
