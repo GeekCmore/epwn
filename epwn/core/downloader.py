@@ -43,12 +43,12 @@ class Downloader:
             }，默认使用配置值
         """
         # 从配置获取默认值
-        self.save_dir = Path(save_dir or config.get("download", "save_dir"))
-        self.max_workers = max_workers or config.get("download", "max_workers")
-        self.chunk_size = chunk_size or config.get("download", "chunk_size")
-        self.max_retries = max_retries or config.get("download", "max_retries")
-        self.timeout = timeout or config.get("download", "timeout")
-        self.proxies = proxies or config.get("download", "proxies")
+        self.save_dir = Path(save_dir or config.get_download("save_dir"))
+        self.max_workers = max_workers or config.get_download("max_workers")
+        self.chunk_size = chunk_size or config.get_download("chunk_size")
+        self.max_retries = max_retries or config.get_download("max_retries")
+        self.timeout = timeout or config.get_download("timeout")
+        self.proxies = proxies or config.get_download("proxies")
         self.console = Console()
         
         # 创建保存目录

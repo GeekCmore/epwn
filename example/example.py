@@ -109,7 +109,7 @@ def extract_packages(package_files: List[str]) -> str:
     console = Console()
     console.print("\n[yellow]Extracting packages...")
     
-    extractor = PackageExtractor(extract_dir="extracted")
+    extractor = PackageExtractor()  # 使用配置中的默认值
     results = []
     
     for pkg_file in package_files:

@@ -14,26 +14,29 @@ console = Console()
 
 def display_config():
     """显示当前配置的辅助函数"""
-    current_config = config_instance.get_all()
-    
     table = Table(title="Current Configuration")
     table.add_column("Section", style="cyan")
     table.add_column("Key", style="green")
     table.add_column("Value", style="yellow")
     
-    for section, values in current_config.items():
-        if isinstance(values, dict):
-            for key, value in values.items():
-                # 格式化值显示
-                if value is None:
-                    value_str = "None"
-                elif isinstance(value, (dict, list)):
-                    value_str = json.dumps(value, ensure_ascii=False)
-                else:
-                    value_str = str(value)
-                table.add_row(section, key, value_str)
-        else:
-            table.add_row(section, "", str(values))
+    # 显示路径配置
+    for key, value in config_instance.config.paths.__dict__.items():
+        if not key.startswith("_"):
+            table.add_row("paths", key, str(value))
+            
+    # 显示数据库配置
+    for key, value in config_instance.config.database.__dict__.items():
+        if not key.startswith("_"):
+            table.add_row("database", key, str(value))
+            
+    # 显示下载配置
+    for key, value in config_instance.config.download.__dict__.items():
+        if not key.startswith("_"):
+            if isinstance(value, (dict, list)):
+                value_str = json.dumps(value, ensure_ascii=False)
+            else:
+                value_str = str(value)
+            table.add_row("download", key, value_str)
             
     console.print(table)
 
@@ -70,6 +73,7 @@ def set(section: str, key: str, value: str):
     epwn config set paths base_dir ~/.epwn
     epwn config set paths data_dir ~/.epwn/data
     epwn config set paths download_dir ~/.epwn/downloads
+    epwn config set paths extract_dir ~/.epwn/extract
     epwn config set paths cache_dir ~/.epwn/cache
     
     # 数据库配置
@@ -107,8 +111,14 @@ def set(section: str, key: str, value: str):
                         # 保持为字符串
                         parsed_value = value
                         
-        # 设置配置
-        config_instance.set(section, key, parsed_value)
+        # 根据配置段落设置值
+        if section == "paths":
+            config_instance.set_path(key, parsed_value)
+        elif section == "database":
+            config_instance.set_database(key, parsed_value)
+        elif section == "download":
+            config_instance.set_download(key, parsed_value)
+            
         console.print(f"[green]Successfully set {section}.{key} = {parsed_value}")
         
     except Exception as e:
@@ -119,10 +129,8 @@ def set(section: str, key: str, value: str):
 def reset():
     """重置为默认配置"""
     try:
-        # 加载默认配置
-        default_config = config_instance._load_default_config()
-        # 保存为当前配置
-        config_instance.save_config(default_config)
+        # 重置配置
+        config_instance.reset()
         console.print("[green]Configuration has been reset to defaults")
         
         # 显示新的配置

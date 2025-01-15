@@ -10,6 +10,7 @@ from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeRe
 import os
 import tarfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from .config import config
 
 @dataclass
 class ExtractionResult:
@@ -22,20 +23,21 @@ class ExtractionResult:
 
 class PackageExtractor:
     """包解压器"""
-    def __init__(self, extract_dir: str = "extracted", max_workers: int = 5):
+    def __init__(self, extract_dir: Optional[str] = None, max_workers: int = 5):
         """
         初始化解压器
         
         Args:
-            extract_dir: 解压目标目录
+            extract_dir: 解压目标目录，默认使用配置值
             max_workers: 最大并发解压数
         """
-        self.extract_dir = Path(extract_dir)
+        # 从配置获取默认值
+        self.extract_dir = Path(extract_dir or config.get_path("extract_dir"))
         self.console = Console()
         self.max_workers = max_workers
         
         # 创建解压目录
-        os.makedirs(extract_dir, exist_ok=True)
+        os.makedirs(self.extract_dir, exist_ok=True)
         
     def _extract_single_package(self, package_path: str, progress, task_id) -> ExtractionResult:
         """

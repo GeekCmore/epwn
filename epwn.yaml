@@ -21,6 +21,10 @@ paths:
   # 用于存储下载的文件
   download_dir: ${HOME}/.epwn/downloads
 
+  # 解压目录
+  # 用于存储解压后的文件
+  extract_dir: ${HOME}/.epwn/extract
+
   # 缓存目录
   # 用于存储临时文件
   cache_dir: ${HOME}/.epwn/cache
