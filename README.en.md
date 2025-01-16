@@ -37,8 +37,34 @@ EPwn is a powerful GLIBC version management and ELF file patching tool designed 
 
 ## Installation
 
+### From Source Code
+
+1. Clone the repository:
 ```bash
-pip install epwn
+git clone https://github.com/GeekCmore/epwn.git
+cd epwn
+```
+
+2. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+3. Install to system:
+```bash
+pip install -e .
+```
+
+4. Initialize configuration:
+```bash
+epwn config setup
+```
+
+### Verify Installation
+
+Run the following command to verify the installation:
+```bash
+epwn --help
 ```
 
 ## Detailed Usage

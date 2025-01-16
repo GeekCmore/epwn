@@ -36,8 +36,35 @@ EPwn 是一个强大的 GLIBC 版本管理和 ELF 文件补丁工具，专为 CT
   - rich >= 10.0.0
 
 ## 安装
+
+### 从源码安装
+
+1. 克隆仓库：
 ```bash
-pip install epwn
+git clone https://github.com/GeekCmore/epwn.git
+cd epwn
+```
+
+2. 安装依赖：
+```bash
+pip install -r requirements.txt
+```
+
+3. 安装到系统：
+```bash
+pip install -e .
+```
+
+4. 初始化配置：
+```bash
+epwn config setup
+```
+
+### 验证安装
+
+运行以下命令验证安装是否成功：
+```bash
+epwn --help
 ```
 
 ## 详细使用说明
