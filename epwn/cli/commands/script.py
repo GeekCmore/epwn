@@ -29,8 +29,10 @@ def auto(binary, output_file, template, prompt):
     
     参数说明:
     \b
-    BINARY: 目标程序路径
-    OUTPUT_FILE: 输出脚本文件路径
+    binary: 目标程序路径
+    output_file: 输出脚本文件路径
+    template: 脚本模板文件路径
+    prompt: 提供给AI的额外提示信息
     
     示例:
     \b
@@ -62,8 +64,10 @@ def record(binary, output_file, template, prompt):
     
     参数说明:
     \b
-    BINARY: 目标程序路径
-    OUTPUT_FILE: 输出脚本文件路径
+    binary: 目标程序路径
+    output_file: 输出脚本文件路径
+    template: 脚本模板文件路径
+    prompt: 提供给AI的额外提示信息
     
     示例:
     \b
