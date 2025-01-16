@@ -3,10 +3,12 @@ ELF补丁模块
 """
 import os
 import re
+import glob
 import subprocess
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Tuple
 from pathlib import Path
+from rich.console import Console
 
 from .version import GlibcVersionManager
 
@@ -15,6 +17,7 @@ class PatchResult:
     """补丁结果"""
     success: bool
     error: Optional[str] = None
+    ldd_info: Optional[str] = None
 
 class ElfPatcher:
     """ELF文件补丁工具"""
@@ -27,6 +30,7 @@ class ElfPatcher:
         """
         self._elf_path = elf_path
         self._version_manager = GlibcVersionManager()
+        self.console = Console()
         
         if elf_path and not os.path.exists(elf_path):
             raise FileNotFoundError(f"File not found: {elf_path}")
@@ -44,18 +48,33 @@ class ElfPatcher:
         """
         try:
             # 查找指定版本的GLIBC
-            glibc_info = self._version_manager.find_glibc(version)
+            glibc_info = self._version_manager.get_glibc_info(version)
             if not glibc_info:
                 return PatchResult(False, f"GLIBC version {version} not found")
             
             # 设置ELF文件路径
             self._elf_path = elf_path
             
-            # 应用补丁
-            self._patch_interpreter(glibc_info["interpreter"])
-            self._patch_rpath(str(Path(glibc_info["interpreter"]).parent))
+            # 获取架构
+            arch = self.get_arch()
             
-            return PatchResult(True)
+            # 查找链接器和libc路径
+            interpreter_path, libc_path = self._find_glibc_files(glibc_info["libc_path"], arch)
+            if not interpreter_path or not libc_path:
+                return PatchResult(False, "Failed to find required GLIBC files")
+            
+            # 应用补丁
+            self._patch_interpreter(interpreter_path)
+            self._patch_rpath(str(Path(libc_path).parent))
+            
+            # 获取ldd信息
+            ldd_info = self._get_ldd_info()
+            
+            # 打印ldd信息
+            self.console.print("\n[cyan]Current library dependencies:[/cyan]")
+            self.console.print(ldd_info)
+            
+            return PatchResult(True, ldd_info=ldd_info)
             
         except Exception as e:
             return PatchResult(False, str(e))
@@ -96,6 +115,31 @@ class ElfPatcher:
                 
         except subprocess.CalledProcessError as e:
             raise RuntimeError(f"Failed to get architecture: {e}")
+            
+    def _find_glibc_files(self, base_path: str, arch: str) -> Tuple[Optional[str], Optional[str]]:
+        """
+        查找指定架构的链接器和libc文件
+        
+        Args:
+            base_path: GLIBC基础路径
+            arch: 目标架构
+            
+        Returns:
+            Tuple[Optional[str], Optional[str]]: (链接器路径, libc路径)
+        """
+        try:
+            # 查找链接器
+            ld_paths = glob.glob(os.path.join(base_path, "ld*"))
+            interpreter_path = ld_paths[0] if ld_paths else None
+            
+            # 查找libc
+            libc_paths = glob.glob(os.path.join(base_path, "libc.so.6"))
+            libc_path = libc_paths[0] if libc_paths else None
+            
+            return interpreter_path, libc_path
+            
+        except Exception as e:
+            raise RuntimeError(f"Failed to find GLIBC files: {e}")
     
     def _patch_interpreter(self, interpreter_path: str):
         """
@@ -134,3 +178,27 @@ class ElfPatcher:
             )
         except subprocess.CalledProcessError as e:
             raise RuntimeError(f"Failed to patch RPATH: {e.stderr.decode()}")
+            
+    def _get_ldd_info(self) -> str:
+        """
+        获取ELF文件的ldd信息
+        
+        Returns:
+            str: ldd命令输出
+            
+        Raises:
+            RuntimeError: 执行ldd命令失败时抛出
+        """
+        if not self._elf_path:
+            raise RuntimeError("ELF path not set")
+            
+        try:
+            result = subprocess.run(
+                ["ldd", self._elf_path],
+                check=True,
+                capture_output=True,
+                text=True
+            )
+            return result.stdout
+        except subprocess.CalledProcessError as e:
+            raise RuntimeError(f"Failed to get ldd info: {e}")
