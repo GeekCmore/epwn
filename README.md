@@ -65,6 +65,32 @@ epwn glibc install [选项]
     -p, --packages  需要下载的包 [libc6|libc6-dbg|glibc-source] (可多选)
 ```
 
+#### 清理所有文件
+```bash
+# 清理所有epwn相关的文件和目录（会提示确认）
+epwn glibc clean
+
+# 强制清理，跳过确认
+epwn glibc clean --force
+
+# 清理时保留配置文件
+epwn glibc clean --keep-config
+
+# 预览将要删除的文件（不实际删除）
+epwn glibc clean --dry-run
+
+# 清理时跳过版本管理文件
+epwn glibc clean --skip-versions
+
+# 完整选项说明
+epwn glibc clean [选项]
+  选项:
+    --force         跳过确认直接删除
+    --keep-config   保留配置文件
+    --dry-run      只显示将要删除的文件，不实际删除
+    --skip-versions 不删除版本管理相关文件
+```
+
 ### ELF 补丁命令
 
 #### 交互式选择 GLIBC 版本

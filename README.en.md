@@ -65,6 +65,32 @@ epwn glibc install [OPTIONS]
     -p, --packages  Packages to download [libc6|libc6-dbg|glibc-source] (multiple allowed)
 ```
 
+#### Clean All Files
+```bash
+# Clean all epwn-related files and directories (with confirmation prompt)
+epwn glibc clean
+
+# Force clean without confirmation
+epwn glibc clean --force
+
+# Clean while keeping configuration files
+epwn glibc clean --keep-config
+
+# Preview files to be deleted (without actually deleting)
+epwn glibc clean --dry-run
+
+# Clean without touching version management files
+epwn glibc clean --skip-versions
+
+# Complete options reference
+epwn glibc clean [OPTIONS]
+  Options:
+    --force         Skip confirmation and delete directly
+    --keep-config   Keep configuration files
+    --dry-run      Show files to be deleted without actually deleting
+    --skip-versions Skip version management related files
+```
+
 ### ELF Patching Commands
 
 #### Interactive GLIBC Version Selection
@@ -146,6 +172,14 @@ epwn/
 - rich >= 10.0.0
 - requests >= 2.25.0
 - beautifulsoup4 >= 4.9.0
+
+## Contributing
+
+1. Fork the project
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Create a Pull Request
 
 ## License
 
