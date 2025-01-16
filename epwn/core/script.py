@@ -15,10 +15,9 @@ import time
 import os
 import select
 import signal
-import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from queue import Queue
-import itertools
+import sys
 
 # 创建console并设置不截断输出
 console = Console()
@@ -58,14 +57,20 @@ class ProcessManager:
                 break
                 
             try:
-                readable, _, _ = select.select([proc.stdout], [], [], 0.1)
+                readable, _, _ = select.select([proc.stdout], [], [], 0.01)
                 if not readable:
+                    if output:  # 如果已经有输出了，再等待一小段时间确保没有更多数据
+                        readable, _, _ = select.select([proc.stdout], [], [], 0.05)
+                        if not readable:
+                            break
                     continue
-                    
-                line = proc.stdout.readline()
-                if not line:
+                
+                # 使用read()一次性读取所有可用数据
+                chunk = os.read(proc.stdout.fileno(), 4096).decode()
+                if not chunk:
                     break
-                output += line
+                output += chunk
+                
             except (select.error, IOError):
                 break
                 
@@ -439,6 +444,66 @@ class ScriptGenerator:
             console.print(f"[green]Script saved successfully to {filename}[/green]")
         except Exception as e:
             console.print(f"[red]Error saving script: {str(e)}[/red]")
+
+class InteractionRecorder:
+    """交互记录器"""
+    def __init__(self, binary_path: str):
+        self.binary_path = binary_path
+        self.process_manager = ProcessManager(binary_path)
+        self.interaction_history: List[InteractionResult] = []
+        self.running = False
+        
+    def start(self):
+        """启动记录会话"""
+        try:
+            self.process = self.process_manager.start_process()
+            self.running = True
+            
+            # 获取初始输出
+            initial_output = self.process_manager.read_output(self.process)
+            if initial_output:
+                self.interaction_history.append(InteractionResult(
+                    input_sequence=[],
+                    output=initial_output
+                ))
+                
+            console.print("[green]Recording started. Press Ctrl+D to end.[/green]")
+            
+            # 确保输出完整显示
+            sys.stdout.write(initial_output)
+            sys.stdout.flush()
+            
+            while self.running:
+                try:
+                    # 使用sys.stdout.write确保输出完整显示
+                    sys.stdout.flush()
+                    user_input = input()
+                    
+                    # 发送用户输入并获取输出
+                    output = self.process_manager.interact(self.process, user_input)
+                    
+                    # 记录交互
+                    self.interaction_history.append(InteractionResult(
+                        input_sequence=[user_input],
+                        output=output
+                    ))
+                    
+                    # 确保输出完整显示
+                    sys.stdout.write(output)
+                    sys.stdout.flush()
+                    
+                except EOFError:
+                    self.running = False
+                except KeyboardInterrupt:
+                    self.running = False
+                    
+        finally:
+            if hasattr(self, 'process'):
+                self.process_manager.cleanup_process(self.process)
+                
+    def get_history(self) -> List[InteractionResult]:
+        """获取记录的交互历史"""
+        return self.interaction_history
 
 def get_script_generator() -> ScriptGenerator:
     """Get or create a script generator instance with proper error handling"""
