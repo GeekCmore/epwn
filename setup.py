@@ -13,6 +13,7 @@ setup(
         'rich>=10.0.0',
         'requests>=2.25.0',
         'beautifulsoup4>=4.9.0',
+        'openai>=1.0.0',
     ],
     entry_points={
         'console_scripts': [

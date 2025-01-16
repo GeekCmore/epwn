@@ -5,6 +5,7 @@ from .core.patcher import ElfPatcher, GlibcVersionManager
 from .core.crawler import GlibcCrawler
 from .core.downloader import Downloader
 from .core.extractor import PackageExtractor
+from .core.script import ScriptGenerator, InteractionResult
 
 __version__ = "0.1.0"   
 __all__ = [
@@ -13,4 +14,6 @@ __all__ = [
     'GlibcCrawler',
     'Downloader',
     'PackageExtractor',
+    'ScriptGenerator',
+    'InteractionResult',
 ] 

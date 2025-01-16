@@ -32,18 +32,29 @@ class DownloadConfig:
     proxies: Optional[Dict[str, str]] = None
 
 @dataclass
+class OpenAIConfig:
+    """OpenAI配置模型"""
+    api_key: str = ""
+    model: str = "gpt-4"
+    temperature: float = 0.1
+    max_tokens: int = 2000
+    base_url: str = "https://api.deepseek.com"
+
+@dataclass
 class ConfigModel:
     """配置模型"""
     paths: PathsConfig = field(default_factory=PathsConfig)
     database: DatabaseConfig = field(default_factory=DatabaseConfig)
     download: DownloadConfig = field(default_factory=DownloadConfig)
+    openai: OpenAIConfig = field(default_factory=OpenAIConfig)
 
     def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return {
             "paths": asdict(self.paths),
             "database": asdict(self.database),
-            "download": asdict(self.download)
+            "download": asdict(self.download),
+            "openai": asdict(self.openai)
         }
 
     @classmethod
@@ -52,7 +63,8 @@ class ConfigModel:
         paths = PathsConfig(**data.get("paths", {}))
         database = DatabaseConfig(**data.get("database", {}))
         download = DownloadConfig(**data.get("download", {}))
-        return cls(paths=paths, database=database, download=download)
+        openai = OpenAIConfig(**data.get("openai", {}))
+        return cls(paths=paths, database=database, download=download, openai=openai)
 
 class PathManager:
     """路径管理器"""
@@ -195,6 +207,20 @@ class Config:
             
         return value
 
+    def get_openai(self, key: str, default: Any = None, ensure_init: bool = True) -> Any:
+        """获取OpenAI配置"""
+        if ensure_init:
+            self.ensure_initialized()
+            
+        if self.config is None:
+            raise RuntimeError("Configuration not initialized. Please run 'epwn config setup' first.")
+            
+        value = getattr(self.config.openai, key, default)
+        if value is None:
+            return default
+            
+        return value
+
     def apply_user_config(self, paths_config: Dict[str, str]) -> None:
         """应用用户配置"""
         self.config = ConfigModel()  # 创建新的默认配置
@@ -207,6 +233,8 @@ class Config:
                 setattr(self.config.database, key, value)
             elif key == "download_dir":  # 特殊处理download_dir
                 setattr(self.config.download, key, value)
+            elif hasattr(self.config.openai, key):  # 处理OpenAI配置
+                setattr(self.config.openai, key, value)
                 
         # 保存配置并确保目录存在
         self.save_config(self.config)
@@ -285,6 +313,12 @@ class Config:
         """设置下载配置"""
         if hasattr(self.config.download, key):
             setattr(self.config.download, key, value)
+            self.save_config(self.config)
+
+    def set_openai(self, key: str, value: Any) -> None:
+        """设置OpenAI配置"""
+        if hasattr(self.config.openai, key):
+            setattr(self.config.openai, key, value)
             self.save_config(self.config)
 
     def delete_config(self) -> None:

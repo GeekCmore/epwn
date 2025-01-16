@@ -52,6 +52,17 @@ def display_config():
                 value_str = str(value)
             table.add_row("download", key, value_str)
             
+        # 显示OpenAI配置
+        openai_keys = ["api_key", "model", "temperature", "max_tokens", "base_url"]
+        for key in openai_keys:
+            value = config_instance.get_openai(key, ensure_init=False)
+            if key == "api_key" and value:
+                # 只显示API key的前6位和后4位，中间用*替代
+                value_str = value[:6] + "*" * 20 + value[-4:] if len(value) > 10 else "***"
+            else:
+                value_str = str(value)
+            table.add_row("openai", key, value_str)
+            
         console.print(table)
     except Exception as e:
         console.print(f"[red]Error displaying configuration: {e}[/red]")
@@ -95,13 +106,37 @@ def setup():
             "glibc_db": Prompt.ask("数据库文件", default=os.path.join(xdg_data_home, "epwn", "data", "glibc.db"))
         }
 
+    # OpenAI配置
+    console.print("\n[cyan]设置OpenAI API配置[/cyan]")
+    openai_config = {
+        "api_key": Prompt.ask(
+            "OpenAI API Key",
+            password=True,
+            default=os.environ.get("OPENAI_API_KEY", "")
+        ),
+        "model": Prompt.ask(
+            "模型名称",
+            default="gpt-4"
+        ),
+        "temperature": float(Prompt.ask(
+            "Temperature (0.0-1.0)",
+            default="0.1"
+        )),
+        "max_tokens": int(Prompt.ask(
+            "最大Token数",
+            default="2000"
+        )),
+        "base_url": Prompt.ask(
+            "API Base URL",
+            default="https://api.deepseek.com"
+        )
+    }
+
+    # 更新配置
     try:
-        # 应用配置
+        paths_config.update(openai_config)
         config_instance.apply_user_config(paths_config)
-        console.print("\n[green]配置完成！所有必要的目录已创建。[/green]")
-        
-        # 显示当前配置
-        console.print("\n当前配置：")
+        console.print("\n[green]配置完成！[/green]")
         display_config()
     except Exception as e:
         console.print(f"\n[red]配置失败：{str(e)}[/red]")
@@ -117,7 +152,7 @@ def show():
         sys.exit(1)
 
 @config_cli.command()
-@click.argument("section", type=click.Choice(["paths", "database", "download"]))
+@click.argument("section", type=click.Choice(["paths", "database", "download", "openai"]))
 @click.argument("key")
 @click.argument("value")
 def set(section: str, key: str, value: str):
@@ -125,7 +160,7 @@ def set(section: str, key: str, value: str):
 
     参数说明:
     \b
-    SECTION: 配置段落，可选值: paths, database, download
+    SECTION: 配置段落，可选值: paths, database, download, openai
     KEY: 配置项名称
     VALUE: 要设置的值
     
@@ -148,6 +183,12 @@ def set(section: str, key: str, value: str):
     epwn config set download max_retries 3
     epwn config set download timeout 30
     epwn config set download proxies '{"http":"http://127.0.0.1:7890"}'
+
+    # OpenAI配置
+    epwn config set openai api_key sk-xxx...
+    epwn config set openai model gpt-4
+    epwn config set openai temperature 0.1
+    epwn config set openai max_tokens 2000
     """
     try:
         # 尝试解析值
@@ -180,6 +221,8 @@ def set(section: str, key: str, value: str):
             config_instance.set_database(key, parsed_value)
         elif section == "download":
             config_instance.set_download(key, parsed_value)
+        elif section == "openai":
+            config_instance.set_openai(key, parsed_value)
             
         console.print(f"[green]Successfully set {section}.{key} = {parsed_value}")
         
