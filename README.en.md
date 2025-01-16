@@ -1,186 +1,119 @@
-# epwn
+# EPWN
 
-[中文](README.md) | English
-
-epwn is a powerful GLIBC version management and ELF binary patching tool. It helps you download and manage different versions of GLIBC, and patch ELF binaries to use specific GLIBC versions.
+EPWN is a Python-based PWN automation tool that integrates script generation and program analysis capabilities.
 
 ## Features
 
-- 🔍 Automatically crawl and download specific GLIBC packages
-- 📦 Manage multiple GLIBC versions
-- 🛠 Patch ELF binaries to use specific GLIBC versions
-- 🧪 Comprehensive testing functionality
-- 💻 Supports both CLI and Python API
+- Automatic binary program analysis and pwntools script generation
+- Intelligent analysis powered by OpenAI API
+- Support for script templates and custom prompts
+- Parallel program state exploration
+- Interactive menu analysis
+- Comprehensive CLI command support
 
 ## Installation
-
-### Requirements
-
-- Python >= 3.8
-- Linux operating system
-
-### Install via pip
 
 ```bash
 pip install epwn
 ```
 
-### Install from source
+## Configuration
+
+Configure OpenAI API parameters before first use:
 
 ```bash
-git clone https://github.com/GeekCmore/epwn.git
-cd epwn
-pip install -e .
+epwn config set openai.api_key "your-api-key"
+epwn config set openai.base_url "https://api.openai.com/v1"  # Optional, defaults to OpenAI official API
+epwn config set openai.model "gpt-3.5-turbo"  # Optional, defaults to gpt-3.5-turbo
 ```
 
-## Command Line Usage
+## Usage
 
-epwn provides two main command groups: `glibc` and `patch`, each containing multiple subcommands.
+### Auto-Generate PWN Script
 
-### GLIBC Management Commands
-
-#### List Installed Versions
+Basic usage:
 ```bash
-epwn glibc list
+epwn script auto ./vuln exploit.py
 ```
 
-#### Install GLIBC
+Using a template:
 ```bash
-# Install a specific version
-epwn glibc install --version 2.31-0ubuntu9
-
-# Install a specific version with debug packages
-epwn glibc install --version 2.31-0ubuntu9 -p libc6 -p libc6-dbg
-
-# Install the latest 3 subversions of all versions
-epwn glibc install --nums 3
-
-# Complete options reference
-epwn glibc install [OPTIONS]
-  Options:
-    --version TEXT    GLIBC version number
-    --arch TEXT      System architecture (default: amd64)
-    --force         Force reinstallation
-    --nums INTEGER  Number of latest subversions to keep per version (default: 3)
-    -p, --packages  Packages to download [libc6|libc6-dbg|glibc-source] (multiple allowed)
+epwn script auto ./vuln exploit.py -t template.py
 ```
 
-#### Clean All Files
+Providing additional hints:
 ```bash
-# Clean all epwn-related files and directories (with confirmation prompt)
-epwn glibc clean
-
-# Force clean without confirmation
-epwn glibc clean --force
-
-# Clean while keeping configuration files
-epwn glibc clean --keep-config
-
-# Preview files to be deleted (without actually deleting)
-epwn glibc clean --dry-run
-
-# Clean without touching version management files
-epwn glibc clean --skip-versions
-
-# Complete options reference
-epwn glibc clean [OPTIONS]
-  Options:
-    --force         Skip confirmation and delete directly
-    --keep-config   Keep configuration files
-    --dry-run      Show files to be deleted without actually deleting
-    --skip-versions Skip version management related files
+epwn script auto ./vuln exploit.py -p "Watch out for integer overflow"
 ```
 
-### ELF Patching Commands
+### Analyze Program Menu
 
-#### Interactive GLIBC Version Selection
 ```bash
-# Select a GLIBC version from installed versions to patch the binary
-epwn patch choose your_binary
-epwn patch choose your_binary --no-backup  # Don't create backup
+# Save program menu output to file
+./vuln > menu.txt
+# Analyze menu
+epwn script analyze-menu menu.txt
 ```
 
-#### Automatic GLIBC Version Matching
+### Record Interactions Manually
+
+Add successful interaction:
 ```bash
-# Automatically select appropriate GLIBC version based on provided libc file
-epwn patch auto your_binary path/to/libc.so.6
-
-# Complete options reference
-epwn patch auto [OPTIONS] ELF_FILE LIBC_FILE
-  Options:
-    --backup/--no-backup     Create backup or not (default: enabled)
-    -p, --packages          Packages to download [libc6|libc6-dbg|glibc-source] (multiple allowed)
+epwn script add-interaction "1" "Menu option 1 selected"
 ```
 
-## Python API Usage
+Add failed interaction:
+```bash
+epwn script add-interaction "invalid" "Error: Invalid input" --failure --error "Invalid menu option"
+```
 
-epwn can also be used as a Python library, providing a flexible API interface.
+### Get Next Action Suggestion
 
-### GLIBC Download and Management
+```bash
+epwn script next-action
+```
+
+### Generate Script from Records
+
+```bash
+epwn script generate vuln exploit.py
+```
+
+### Clear Interaction History
+
+```bash
+epwn script clear
+```
+
+## Script Templates
+
+You can create custom script templates using the `# SCRIPT_CONTENT` marker to specify where generated content should be inserted:
 
 ```python
-from epwn.core.downloader import Downloader
-from epwn.core.crawler import GlibcCrawler
+from pwn import *
 
-# Get GLIBC download links
-crawler = GlibcCrawler()
-version_info = crawler.getOnePackageDownloadUrl(
-    version="2.31-0ubuntu9",
-    architectures=["amd64"],
-    packages=["libc6", "libc6-dbg"]
-)
+# Custom settings
+context.log_level = 'debug'
+context.arch = 'amd64'
 
-# Download GLIBC packages
-downloader = Downloader(save_dir="downloads")
-results = downloader.download(version_info.get_urls())
+# SCRIPT_CONTENT
+
+# Custom helper functions
+def debug():
+    gdb.attach(io)
+    pause()
 ```
 
-### ELF Patching Operations
+## Important Notes
 
-```python
-from epwn.core.patcher import GlibcPatcher
-
-# Create patcher instance
-patcher = GlibcPatcher()
-
-# Add GLIBC
-version, interpreter = patcher.add_libc("path/to/libc.so.6")
-
-# Patch binary
-patcher.patch_binary("your_binary", interpreter)
-```
-
-## Project Structure
-
-```
-epwn/
-├── cli/                # Command line interface
-│   ├── commands/      # Command implementations
-│   └── main.py        # CLI entry point
-├── core/              # Core functionality
-│   ├── crawler.py     # GLIBC package crawler
-│   ├── downloader.py  # Package downloader
-│   ├── extractor.py   # Package extractor
-│   ├── patcher.py     # ELF patcher
-│   └── version.py     # Version management
-└── example/           # Usage examples
-```
-
-## Dependencies
-
-- click >= 8.0.0
-- rich >= 10.0.0
-- requests >= 2.25.0
-- beautifulsoup4 >= 4.9.0
+1. Ensure target programs have executable permissions
+2. It's recommended to backup important files before use
+3. Generated scripts may need adjustments based on specific scenarios
 
 ## Contributing
 
-1. Fork the project
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Create a Pull Request
+Issues and Pull Requests are welcome!
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details 
+MIT License 
