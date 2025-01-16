@@ -293,64 +293,63 @@ class ScriptGenerator:
         console.print(f"[green]Exploration completed. Found {len(self.interaction_history)} unique interactions[/green]")
 
     def auto_generate(self, binary_path: str, template_path: Optional[str] = None, user_prompt: str = "") -> str:
-        """自动探索程序并生成脚本
+        """自动分析程序并生成PWN脚本
         
         Args:
             binary_path: 目标程序路径
-            template_path: 脚本模板文件路径
-            user_prompt: 用户提供的额外提示信息
-        """
-        self.ensure_initialized()
-        self.user_prompt = user_prompt  # 存储用户提示
-        
-        try:
-            binary_path = os.path.abspath(binary_path)
-            if not os.path.exists(binary_path):
-                raise FileNotFoundError(f"Binary not found: {binary_path}")
+            template_path: 模板文件路径
+            user_prompt: 用户提供的额外提示
             
+        Returns:
+            str: 生成的脚本内容
+        """
+        try:
             console.print(f"[cyan]Processing binary: {binary_path}[/cyan]")
             
-            # 确保文件是可执行的
-            os.chmod(binary_path, 0o755)
-            
-            # 读取模板
-            template = ""
+            # 加载模板
+            template_content = ""
             if template_path:
-                if os.path.exists(template_path):
-                    console.print(f"[cyan]Loading template from: {template_path}[/cyan]")
+                console.print(f"[cyan]Loading template from: {template_path}[/cyan]")
+                try:
                     with open(template_path, 'r') as f:
-                        template = f.read()
-                else:
-                    console.print(f"[yellow]Warning: Template file not found: {template_path}[/yellow]")
+                        template_content = f.read()
+                except Exception as e:
+                    console.print(f"[yellow]Warning: Failed to load template: {e}[/yellow]")
             
-            # 并行探索程序
+            # 存储用户提示
+            self.user_prompt = user_prompt
+            
+            # 并行探索程序状态
             self.parallel_explore(binary_path)
             
-            # 生成脚本
+            # 生成基础脚本
             program_name = os.path.basename(binary_path)
-            console.print("[cyan]Generating pwntools script...[/cyan]")
             script_content = self.generate_script(program_name, self.interaction_history)
             
-            # 提取纯代码部分
-            if "```python" in script_content:
-                script_content = script_content.split("```python")[1]
-                if "```" in script_content:
-                    script_content = script_content.split("```")[0]
-            
-            # 清理代码
-            script_content = script_content.strip()
-            
-            # 如果有模板，将生成的内容合并到模板中
-            if template:
+            # 合并模板
+            if template_content:
                 console.print("[cyan]Merging with template...[/cyan]")
-                script_content = template.replace("# SCRIPT_CONTENT", script_content)
+                # 保留模板的头部注释
+                header = ""
+                for line in template_content.split('\n'):
+                    if line.startswith('#') or line.startswith("'''") or line.startswith('"""'):
+                        header += line + '\n'
+                    else:
+                        break
+                
+                # 在模板中查找插入点
+                if "# SCRIPT_CONTENT" in template_content:
+                    parts = template_content.split("# SCRIPT_CONTENT")
+                    script_content = parts[0] + script_content + parts[1]
+                else:
+                    script_content = header + "\n" + script_content
             
             console.print("[green]Script generation completed successfully[/green]")
             return script_content
             
         except Exception as e:
-            console.print(f"[red]Error during auto generation: {str(e)}[/red]")
-            return ""
+            console.print(f"[red]Error generating script: {str(e)}[/red]")
+            raise
 
     def generate_script(self, program_name: str, interaction_history: List[InteractionResult]) -> str:
         """生成最终的pwntools脚本"""
@@ -436,14 +435,28 @@ class ScriptGenerator:
             return ""
 
     def save_script(self, script_content: str, filename: str) -> None:
-        """保存生成的脚本到文件"""
+        """保存生成的脚本到文件
+        
+        Args:
+            script_content: 生成的脚本内容
+            filename: 目标文件名
+        """
+        # 清理markdown代码块格式
+        clean_content = script_content
+        if "```" in script_content:
+            # 移除markdown代码块标记
+            lines = script_content.split('\n')
+            clean_lines = []
+            for line in lines:
+                if line.strip() and not line.strip().startswith('```'):
+                    clean_lines.append(line)
+            clean_content = '\n'.join(clean_lines)
+            
         try:
-            console.print(f"[cyan]Saving script to: {filename}[/cyan]")
-            script_path = Path(filename)
-            script_path.write_text(script_content)
-            console.print(f"[green]Script saved successfully to {filename}[/green]")
+            with open(filename, 'w') as f:
+                f.write(clean_content)
         except Exception as e:
-            console.print(f"[red]Error saving script: {str(e)}[/red]")
+            raise
 
 class InteractionRecorder:
     """交互记录器"""
