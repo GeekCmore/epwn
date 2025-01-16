@@ -8,6 +8,7 @@ import sys
 from .commands.glibc import glibc
 from .commands.patch import patch
 from .commands.config import config_cli
+from .commands.clean import clean
 
 console = Console()
 
@@ -20,6 +21,7 @@ def cli():
 cli.add_command(glibc)
 cli.add_command(patch)
 cli.add_command(config_cli, name="config")
+cli.add_command(clean)
 
 # 为了兼容性添加别名
 main = cli

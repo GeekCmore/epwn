@@ -80,10 +80,17 @@ class PathManager:
         # 展开 ${VAR} 变量
         def replace_var(match):
             var_name = match.group(1)
-            return self.xdg_dirs.get(var_name) or os.environ.get(var_name, match.group(0))
+            # 优先使用 xdg_dirs 中的值
+            if var_name in self.xdg_dirs:
+                return self.xdg_dirs[var_name]
+            # 然后尝试环境变量
+            return os.environ.get(var_name, match.group(0))
 
+        # 先处理 ${HOME} 和其他变量
         path = re.sub(r'\${(\w+)}', replace_var, path)
+        # 然后处理 ~ 展开
         path = os.path.expanduser(path)
+        # 最后处理其他环境变量
         path = os.path.expandvars(path)
         return os.path.abspath(path)
 

@@ -31,14 +31,37 @@ class GlibcVersionManager:
             return
             
         self._conn = sqlite3.connect(self.db_path)
-        self._conn.execute("""
-            CREATE TABLE IF NOT EXISTS glibc_versions (
-                version TEXT PRIMARY KEY,
-                libc_path TEXT NOT NULL,
-                interpreter_path TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
+        
+        # 检查表是否存在
+        cursor = self._conn.execute("""
+            SELECT name FROM sqlite_master 
+            WHERE type='table' AND name='glibc_versions'
         """)
+        table_exists = cursor.fetchone() is not None
+        
+        if not table_exists:
+            # 如果表不存在，创建新表
+            self._conn.execute("""
+                CREATE TABLE glibc_versions (
+                    version TEXT PRIMARY KEY,
+                    libc_path TEXT NOT NULL,
+                    interpreter_path TEXT,
+                    debug_path TEXT,
+                    source_path TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+        else:
+            # 如果表存在，检查是否需要添加新列
+            cursor = self._conn.execute("PRAGMA table_info(glibc_versions)")
+            columns = {row[1] for row in cursor.fetchall()}
+            
+            # 添加缺失的列
+            if "debug_path" not in columns:
+                self._conn.execute("ALTER TABLE glibc_versions ADD COLUMN debug_path TEXT")
+            if "source_path" not in columns:
+                self._conn.execute("ALTER TABLE glibc_versions ADD COLUMN source_path TEXT")
+                
         self._conn.commit()
     
     def close(self):
@@ -126,15 +149,18 @@ class GlibcVersionManager:
         
         return (major, minor, ubuntu_minor, ubuntu_patch)
     
-    def add_libc_path(self, libc_path: str) -> Tuple[str, str]:
+    def add_glibc(self, version: str, libc_path: str, debug_path: Optional[str] = None, source_path: Optional[str] = None) -> Tuple[str, str]:
         """
-        添加新的libc文件
+        添加新的glibc文件
         
         Args:
+            version: GLIBC版本号
             libc_path: libc文件路径
+            debug_path: 调试符号文件路径
+            source_path: 源码路径
             
         Returns:
-            Tuple[str, str]: (版本号, 解释器路径)
+            Tuple[str, str, str]: (版本号, 解释器路径, 调试符号路径)
             
         Raises:
             RuntimeError: 添加失败时抛出
@@ -164,9 +190,9 @@ class GlibcVersionManager:
             # 保存到数据库
             self._conn.execute("""
                 INSERT OR REPLACE INTO glibc_versions 
-                (version, libc_path, interpreter_path, created_at)
-                VALUES (?, ?, ?, datetime('now'))
-            """, (version, libc_path, interpreter_path))
+                (version, libc_path, interpreter_path, debug_path, source_path, created_at)
+                VALUES (?, ?, ?, ?, ?, datetime('now'))
+            """, (version, libc_path, interpreter_path, debug_path, source_path))
             self._conn.commit()
             
             self.console.print(f"[green]Added GLIBC {version} from {libc_path}")
@@ -175,7 +201,7 @@ class GlibcVersionManager:
         except FileNotFoundError:
             raise  # 直接重新抛出FileNotFoundError
         except Exception as e:
-            raise RuntimeError(f"Failed to add libc path: {e}")
+            raise RuntimeError(f"Failed to add glibc: {e}")
     
     def find_glibc(self, version: str) -> Optional[Dict[str, str]]:
         """
@@ -185,10 +211,10 @@ class GlibcVersionManager:
             version: GLIBC版本号
             
         Returns:
-            Dict[str, str]: 包含libc和interpreter路径的字典，未找到则返回None
+            Dict[str, str]: 包含libc、interpreter、debug和source路径的字典，未找到则返回None
         """
         cursor = self._conn.execute("""
-            SELECT libc_path, interpreter_path 
+            SELECT libc_path, interpreter_path, debug_path, source_path
             FROM glibc_versions 
             WHERE version = ?
         """, (version,))
@@ -197,7 +223,7 @@ class GlibcVersionManager:
         if not row:
             return None
         
-        libc_path, interpreter_path = row
+        libc_path, interpreter_path, debug_path, source_path = row
         
         # 验证文件是否仍然存在
         if not os.path.exists(libc_path) or not os.path.exists(interpreter_path):
@@ -206,10 +232,18 @@ class GlibcVersionManager:
             self._conn.commit()
             return None
         
-        return {
+        result = {
             "libc": libc_path,
             "interpreter": interpreter_path
         }
+        
+        # 添加可选的调试符号和源码路径
+        if debug_path and os.path.exists(debug_path):
+            result["debug"] = debug_path
+        if source_path and os.path.exists(source_path):
+            result["source"] = source_path
+            
+        return result
     
     def list_versions(self) -> List[Dict[str, str]]:
         """
@@ -219,21 +253,29 @@ class GlibcVersionManager:
             List[Dict[str, str]]: 版本信息列表
         """
         cursor = self._conn.execute("""
-            SELECT version, libc_path, interpreter_path, created_at 
+            SELECT version, libc_path, interpreter_path, debug_path, source_path, created_at 
             FROM glibc_versions 
             ORDER BY version
         """)
         
         versions = []
         for row in cursor.fetchall():
-            version, libc_path, interpreter_path, created_at = row
+            version, libc_path, interpreter_path, debug_path, source_path, created_at = row
             if os.path.exists(libc_path) and os.path.exists(interpreter_path):
-                versions.append({
+                version_info = {
                     "version": version,
                     "libc_path": libc_path,
                     "interpreter_path": interpreter_path,
                     "created_at": created_at
-                })
+                }
+                
+                # 添加可选的调试符号和源码路径
+                if debug_path and os.path.exists(debug_path):
+                    version_info["debug_path"] = debug_path
+                if source_path and os.path.exists(source_path):
+                    version_info["source_path"] = source_path
+                    
+                versions.append(version_info)
         
         return versions
     
