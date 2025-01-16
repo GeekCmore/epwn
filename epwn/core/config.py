@@ -299,27 +299,55 @@ class Config:
 
     def set_path(self, key: str, value: str) -> None:
         """设置路径配置"""
-        if hasattr(self.config.paths, key):
-            setattr(self.config.paths, key, value)
-            self.save_config(self.config)
+        self.ensure_initialized()
+            
+        if self.config is None:
+            raise RuntimeError("Configuration not initialized. Please run 'epwn config setup' first.")
+            
+        if not hasattr(self.config.paths, key):
+            raise ValueError(f"Invalid path configuration key: {key}")
+            
+        setattr(self.config.paths, key, value)
+        self.save_config(self.config)
 
     def set_database(self, key: str, value: Any) -> None:
         """设置数据库配置"""
-        if hasattr(self.config.database, key):
-            setattr(self.config.database, key, value)
-            self.save_config(self.config)
+        self.ensure_initialized()
+            
+        if self.config is None:
+            raise RuntimeError("Configuration not initialized. Please run 'epwn config setup' first.")
+            
+        if not hasattr(self.config.database, key):
+            raise ValueError(f"Invalid database configuration key: {key}")
+            
+        setattr(self.config.database, key, value)
+        self.save_config(self.config)
 
     def set_download(self, key: str, value: Any) -> None:
         """设置下载配置"""
-        if hasattr(self.config.download, key):
-            setattr(self.config.download, key, value)
-            self.save_config(self.config)
+        self.ensure_initialized()
+            
+        if self.config is None:
+            raise RuntimeError("Configuration not initialized. Please run 'epwn config setup' first.")
+            
+        if not hasattr(self.config.download, key):
+            raise ValueError(f"Invalid download configuration key: {key}")
+            
+        setattr(self.config.download, key, value)
+        self.save_config(self.config)
 
     def set_openai(self, key: str, value: Any) -> None:
         """设置OpenAI配置"""
-        if hasattr(self.config.openai, key):
-            setattr(self.config.openai, key, value)
-            self.save_config(self.config)
+        self.ensure_initialized()
+            
+        if self.config is None:
+            raise RuntimeError("Configuration not initialized. Please run 'epwn config setup' first.")
+            
+        if not hasattr(self.config.openai, key):
+            raise ValueError(f"Invalid OpenAI configuration key: {key}")
+            
+        setattr(self.config.openai, key, value)
+        self.save_config(self.config)
 
     def delete_config(self) -> None:
         """删除所有配置"""
