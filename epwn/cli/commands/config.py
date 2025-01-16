@@ -205,7 +205,7 @@ def reset():
 
 @config_cli.command()
 def delete():
-    """删除所有配置和相关目录"""
+    """删除所有配置"""
     try:
         # 显示警告
         console.print("[red]WARNING: This will delete all configuration files and directories![/red]")
@@ -220,7 +220,7 @@ def delete():
             return
             
         # 执行删除
-        config_instance.delete_all()
+        config_instance.delete_config()
         console.print("[green]All configuration files and directories have been deleted.[/green]")
         console.print("[yellow]Run 'epwn config setup' to create a new configuration.[/yellow]")
         

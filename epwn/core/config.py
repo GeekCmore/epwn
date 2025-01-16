@@ -287,55 +287,13 @@ class Config:
             setattr(self.config.download, key, value)
             self.save_config(self.config)
 
-    def delete_all(self) -> None:
-        """删除所有配置和相关目录"""
+    def delete_config(self) -> None:
+        """删除所有配置"""
         try:
-            # 获取所有可能存在的目录
-            paths = []
-            if self.config is not None:
-                # 添加路径配置的目录
-                for key in ["data_dir", "extract_dir"]:
-                    try:
-                        path = self.get_path(key, ensure_init=False)
-                        if path:
-                            paths.append(path)
-                    except:
-                        pass
+            # 删除配置文件
+            if os.path.exists(self.config_file):
+                os.remove(self.config_file)
                 
-                # 添加下载目录
-                try:
-                    path = self.get_download("download_dir", ensure_init=False)
-                    if path:
-                        paths.append(path)
-                except:
-                    pass
-                    
-                # 添加数据库目录
-                try:
-                    path = self.get_database("glibc_db", ensure_init=False)
-                    if path:
-                        db_dir = os.path.dirname(path)
-                        paths.append(db_dir)
-                except:
-                    pass
-            
-            # 添加基础目录
-            base_paths = [
-                os.path.join(self.path_manager.xdg_dirs["XDG_DATA_HOME"], "epwn"),
-                os.path.join(self.path_manager.xdg_dirs["XDG_CACHE_HOME"], "epwn"),
-                os.path.dirname(str(self.config_file))
-            ]
-            paths.extend(base_paths)
-            
-            # 删除所有目录
-            for path in paths:
-                if os.path.exists(path):
-                    if os.path.isfile(path):
-                        os.remove(path)
-                    else:
-                        import shutil
-                        shutil.rmtree(path)
-                        
             # 重置配置
             self.config = None
             self._initialized = False
