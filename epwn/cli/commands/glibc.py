@@ -24,7 +24,7 @@ def glibc():
     pass
 
 @glibc.command()
-def list():
+def show():
     """列出已安装的GLIBC版本"""
     try:
         version_manager = GlibcVersionManager()
@@ -37,7 +37,6 @@ def list():
         table = Table(show_header=True)
         table.add_column("Version", style="cyan")
         table.add_column("Libc Path", style="green")
-        table.add_column("Interpreter Path", style="blue")
         table.add_column("Debug Path", style="magenta")
         table.add_column("Source Path", style="yellow")
         table.add_column("Added At", style="magenta")
@@ -46,7 +45,6 @@ def list():
             table.add_row(
                 version["version"],
                 version["libc_path"],
-                version["interpreter_path"],
                 version.get("debug_path", ""),
                 version.get("source_path", ""),
                 version["created_at"]
@@ -65,7 +63,7 @@ def info(version: str):
     """查看指定GLIBC版本的详细信息"""
     try:
         version_manager = GlibcVersionManager()
-        glibc_info = version_manager.find_glibc(version)
+        glibc_info = version_manager.get_glibc_info(version)
         
         if not glibc_info:
             console.print(f"[yellow]GLIBC version {version} not found.")
@@ -77,18 +75,12 @@ def info(version: str):
         table.add_column("Value", style="green")
         
         table.add_row("Version", version)
-        table.add_row("Libc Path", glibc_info["libc"])
-        table.add_row("Interpreter Path", glibc_info["interpreter"])
+        table.add_row("Libc Path", glibc_info["libc_path"])
         
-        if "debug" in glibc_info:
-            table.add_row("Debug Symbols Path", glibc_info["debug"])
-        if "source" in glibc_info:
-            table.add_row("Source Code Path", glibc_info["source"])
-            
-        # 添加文件大小信息
-        if os.path.exists(glibc_info["libc"]):
-            size = os.path.getsize(glibc_info["libc"]) / 1024 / 1024  # Convert to MB
-            table.add_row("Libc File Size", f"{size:.2f} MB")
+        if "debug_path" in glibc_info:
+            table.add_row("Debug Symbols Path", glibc_info["debug_path"])
+        if "source_path" in glibc_info:
+            table.add_row("Source Code Path", glibc_info["source_path"])
             
         console.print(table)
         
@@ -114,7 +106,7 @@ def _install_glibc(version: Optional[str], arch: str, force: bool, nums: int, pa
     
     # 检查是否已安装
     if version and not force:
-        if version_manager.find_glibc(version):
+        if version_manager.get_glibc_info(version):
             console.print(f"[yellow]GLIBC {version} 已安装。使用--force强制重新安装。")
             return (0, 0, 0)
 
@@ -202,44 +194,77 @@ def _install_glibc(version: Optional[str], arch: str, force: bool, nums: int, pa
     
     # 按版本安装包
     for version, version_pkgs in version_downloads.items():
-        # 解压调试符号包
-        debug_path = None
-        if version_pkgs['libc6-dbg']:
-            extract_result = extractor.extract_package(version_pkgs['libc6-dbg'].file_path)
-            extract_path = Path(extract_result.extract_path)
-            # 递归查找.build-id目录
-            debug_path = str(next(extract_path.rglob('.build-id')))
-        # 解压源码包
-        source_path = None
-        if version_pkgs['glibc-source']:
-            source_extract = extractor.extract_package(version_pkgs['glibc-source'].file_path)
-            source_path = source_extract.extract_path
-            
-            # 查找并解压glibc源码tar包
-            extract_path = Path(source_path)
-            tar_path = next(extract_path.rglob("glibc-*.tar.xz"))
-            if tar_path:
-                # 直接解压到tar包所在目录
-                with tarfile.open(tar_path) as tar:
-                    tar.extractall(path=tar_path.parent)
-                # 获取glibc源码目录路径
-                source_path = str(next(p for p in tar_path.parent.glob("glibc-*") if p.is_dir()))
+        # 一次性解压所有包
+        extract_results = {}
+        pkg_paths = []
+        for pkg_type, pkg in version_pkgs.items():
+            if pkg and pkg.file_path:
+                pkg_paths.append(pkg.file_path)
+        
+        # 解压所有包
+        if pkg_paths:
+            results = extractor.extract(pkg_paths)
+            # 如果是单个结果，转换为列表
+            if not isinstance(results, list):
+                results = [results]
                 
-            
-        # 解压libc6包
+            for result in results:
+                if result.success:
+                    # 根据包名判断类型
+                    if 'libc6_' in result.package_name:
+                        extract_results['libc6'] = result
+                    elif 'libc6-dbg_' in result.package_name:
+                        extract_results['libc6-dbg'] = result
+                    elif 'glibc-source_' in result.package_name:
+                        extract_results['glibc-source'] = result
+        
+        # 处理解压结果
+        debug_path = None
+        source_path = None
         libc_path = None
-        if version_pkgs['libc6']:
-            libc_extract = extractor.extract_package(version_pkgs['libc6'].file_path).extract_path
-            # 查找libc.so.6
-            extract_path = Path(libc_extract)
-            libc_path = str(next(extract_path.rglob("libc.so.6")))
+        
+        # 处理调试符号包
+        if 'libc6-dbg' in extract_results:
+            try:
+                extract_path = Path(extract_results['libc6-dbg'].extract_path)
+                debug_files = list(extract_path.rglob('.build-id'))
+                if debug_files:
+                    debug_path = str(debug_files[0])
+            except Exception as e:
+                console.print(f"[yellow]Warning: Failed to process debug symbols: {e}[/yellow]")
+            
+        # 处理源码包
+        if 'glibc-source' in extract_results:
+            try:
+                source_path = extract_results['glibc-source'].extract_path
+                extract_path = Path(source_path)
+                tar_files = list(extract_path.rglob("glibc-*.tar.xz"))
+                if tar_files:
+                    tar_path = tar_files[0]
+                    with tarfile.open(tar_path) as tar:
+                        tar.extractall(path=tar_path.parent)
+                    source_dirs = [p for p in tar_path.parent.glob("glibc-*") if p.is_dir()]
+                    if source_dirs:
+                        source_path = str(source_dirs[0])
+            except Exception as e:
+                console.print(f"[yellow]Warning: Failed to process source package: {e}[/yellow]")
+                
+        # 处理libc6包
+        if 'libc6' in extract_results:
+            try:
+                extract_path = Path(extract_results['libc6'].extract_path)
+                libc_files = list(extract_path.rglob("libc.so.6"))
+                if libc_files:
+                    libc_path = str(libc_files[0].parent)
+            except Exception as e:
+                console.print(f"[yellow]Warning: Failed to process libc6 package: {e}[/yellow]")
             
         if not libc_path:
             continue
         
         # 添加到数据库
         try:
-            version_manager.add_glibc(version, libc_path, debug_path, source_path)
+            version_manager.add_version(version, libc_path, debug_path, source_path)
             count = sum(1 for path in [libc_path, debug_path, source_path] if path is not None)
             installed_count += count
             # 打印安装的路径信息
@@ -293,93 +318,32 @@ def install(version: Optional[str], arch: str, force: bool, nums: int, packages:
 
 @glibc.command()
 @click.option('--force', is_flag=True, help='跳过确认直接删除')
-@click.option('--keep-files', is_flag=True, help='保留已解压的文件')
-def clean(force: bool, keep_files: bool):
+def clean(force: bool):
     """删除所有已安装的GLIBC版本"""
     try:
-        version_manager = GlibcVersionManager()
-        installed_versions = version_manager.list_versions()
+        # 获取配置的数据目录
+        data_dir = os.path.join(os.path.expanduser("~"), ".local", "share", "epwn", "data")
+        glibc_dir = os.path.join(data_dir, "glibc")
         
-        if not installed_versions:
-            console.print("[yellow]No GLIBC versions installed.")
+        if not os.path.exists(glibc_dir):
+            console.print("[yellow]No GLIBC files found.")
             return
             
-        # 显示将要删除的版本
-        table = Table(show_header=True)
-        table.add_column("Version", style="cyan")
-        table.add_column("Libc Path", style="green")
-        table.add_column("Debug Path", style="blue")
-        table.add_column("Source Path", style="magenta")
-        
-        for version in installed_versions:
-            row = [
-                version["version"],
-                version["libc_path"],
-                version.get("debug_path", ""),
-                version.get("source_path", "")
-            ]
-            table.add_row(*row)
-            
-        console.print("\nVersions to be deleted:")
-        console.print(table)
-        
         # 确认删除
         if not force:
-            confirm = input("\nAre you sure you want to delete all GLIBC versions? [y/N] ")
+            confirm = input("\nAre you sure you want to delete all GLIBC files? [y/N] ")
             if confirm.lower() != 'y':
                 console.print("[yellow]Operation cancelled.")
                 return
         
-        deleted_count = 0
-        deleted_files = 0
-        
-        # 删除每个版本
-        for version in installed_versions:
-            # 删除数据库记录
-            if version_manager.remove_version(version["version"]):
-                deleted_count += 1
-                
-                # 删除文件
-                if not keep_files:
-                    paths_to_delete = []
-                    
-                    # 收集所有需要删除的文件所在目录
-                    for path_key in ["libc_path", "debug_path", "source_path"]:
-                        if path_key in version:
-                            path = version[path_key]
-                            if path and os.path.exists(path):
-                                # 获取解压目录（文件的父目录的父目录）
-                                extract_dir = Path(path).parent.parent
-                                if extract_dir not in paths_to_delete:
-                                    paths_to_delete.append(extract_dir)
-                    
-                    # 删除解压目录
-                    for path in paths_to_delete:
-                        try:
-                            if os.path.exists(path):
-                                shutil.rmtree(path)
-                                deleted_files += 1
-                        except Exception as e:
-                            console.print(f"[red]Failed to delete {path}: {e}")
-        
-        # 显示删除结果
-        result_table = Table(show_header=True)
-        result_table.add_column("Status", style="cyan")
-        result_table.add_column("Count", style="green")
-        
-        result_table.add_row(
-            "Versions deleted",
-            str(deleted_count)
-        )
-        if not keep_files:
-            result_table.add_row(
-                "Directories cleaned",
-                str(deleted_files)
-            )
-        
-        console.print("\nCleanup Summary:")
-        console.print(result_table)
-        
+        # 删除glibc目录
+        try:
+            shutil.rmtree(glibc_dir)
+            console.print("[green]Successfully deleted all GLIBC files.")
+        except Exception as e:
+            console.print(f"[red]Failed to delete GLIBC directory: {str(e)}")
+            sys.exit(1)
+            
     except Exception as e:
-        console.print(f"[red]Failed to clean GLIBC versions: {str(e)}")
+        console.print(f"[red]Failed to clean GLIBC files: {str(e)}")
         sys.exit(1)

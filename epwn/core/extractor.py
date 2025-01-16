@@ -2,7 +2,7 @@
 from pathlib import Path
 import subprocess
 import shutil
-from typing import Optional, Dict, List
+from typing import Optional, Dict, List, Union
 from dataclasses import dataclass
 from rich.console import Console
 from rich.table import Table
@@ -95,35 +95,32 @@ class PackageExtractor:
                 error=str(e)
             )
             
-    def extract_package(self, package_path: str) -> ExtractionResult:
+    def extract(self, package_paths: Union[str, List[str]], max_workers: int = 5) -> Union[ExtractionResult, List[ExtractionResult]]:
         """
-        解压单个包文件
+        解压包文件，支持单个包或多个包
         
         Args:
-            package_path: 包文件路径
+            package_paths: 包文件路径或路径列表
+            max_workers: 最大并发数，默认5
             
         Returns:
-            ExtractionResult: 解压结果
+            Union[ExtractionResult, List[ExtractionResult]]: 单个包时返回单个结果，多个包时返回结果列表
         """
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            BarColumn(),
-            TimeRemainingColumn(),
-        ) as progress:
-            task_id = progress.add_task(f"[cyan]Extracting {Path(package_path).stem}", total=None)
-            return self._extract_single_package(package_path, progress, task_id)
-        
-    def extract_packages(self, package_paths: List[str]) -> List[ExtractionResult]:
-        """
-        并发解压多个包文件
-        
-        Args:
-            package_paths: 包文件路径列表
-            
-        Returns:
-            List[ExtractionResult]: 解压结果列表
-        """
+        # 处理单个包的情况
+        if isinstance(package_paths, str):
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                BarColumn(),
+                TimeRemainingColumn(),
+            ) as progress:
+                task_id = progress.add_task(f"[cyan]Extracting {Path(package_paths).stem}", total=None)
+                result = self._extract_single_package(package_paths, progress, task_id)
+                self._print_summary([result])
+                return result
+                
+        # 处理多个包的情况
+        package_paths = list(package_paths)  # 确保是列表
         results = []
         
         with Progress(
@@ -135,7 +132,7 @@ class PackageExtractor:
             # 创建总体进度任务
             overall_task = progress.add_task("[yellow]Total Progress", total=None)
             
-            with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 futures = []
                 for path in package_paths:
                     task_id = progress.add_task(f"[cyan]Extracting {Path(path).stem}", total=None)

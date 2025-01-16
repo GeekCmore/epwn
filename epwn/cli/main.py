@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 import click
 from rich.console import Console
-from pathlib import Path
-import sys
 
 # 导入命令模块
 from .commands.glibc import glibc
