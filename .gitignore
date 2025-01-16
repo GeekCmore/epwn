@@ -95,3 +95,4 @@ logging/
 
 # Cursor
 .cursorrules
+.cursorignore
